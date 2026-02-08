@@ -17,6 +17,7 @@ const currentWeatherStats = document.getElementById("current-weather-stats");
 const dailyStats = document.getElementById("daily-stats");
 const hourlyStats = document.getElementById("hourly-stats");
 
+const mainContent = document.getElementById("main-content");
 const userAddress = document.getElementById("user-address");
 const userInput = document.getElementById("user-input");
 
@@ -123,30 +124,77 @@ function renderHourly(dayIndex) {
     .join("");
 }
 
+function renderError() {
+  mainContent.innerHTML = `
+    <div class="flex flex-col items-center justify-center gap-4 text-center py-20">
+      <img src="assets/images/icon-error.svg" class="w-12 opacity-80" />
+      <h2 class="text-3xl font-bold">Something went wrong</h2>
+      <p class="text-white/70 max-w-md">
+        We couldn't connect to the server (API error). Please try again in a few moments.
+      </p>
+      <button
+        onclick="location.reload()"
+        class="mt-4 rounded-lg bg-[#2C2D4A] px-6 py-3 font-semibold hover:bg-[#3A3B5E] transition"
+      >
+        Retry
+      </button>
+    </div>
+  `;
+
+  currentWeatherStats.innerHTML = "";
+  dailyStats.innerHTML = "";
+  hourlyStats.innerHTML = "";
+}
+
+function renderEmptySearch() {
+  mainContent.innerHTML = `
+    <div class="flex flex-col items-center justify-center gap-3 text-center py-20">
+      <p class="text-lg font-semibold">No search result found!</p>
+    </div>
+  `;
+
+  currentWeatherStats.innerHTML = "";
+  dailyStats.innerHTML = "";
+  hourlyStats.innerHTML = "";
+}
+
 async function fetchUserInput(city) {
-  const geoRes = await fetch(
-    `https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1`,
-  );
+  try {
+    const geoRes = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1`,
+    );
 
-  geoData = await geoRes.json();
-  const { latitude, longitude, name, country } = geoData.results[0];
+    const geoData = await geoRes.json();
 
-  const weatherRes = await fetch(
-    `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,precipitation,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=weather_code,temperature_2m&timezone=auto`,
-  );
+    if (!geoData.results || geoData.results.length === 0) {
+      renderEmptySearch();
+      return;
+    }
 
-  weatherData = await weatherRes.json();
+    const { latitude, longitude, name, country } = geoData.results[0];
 
-  const today = new Date().toLocaleDateString(undefined, {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-  renderCurrent(weatherData, name, country, today);
-  renderStats(weatherData);
-  renderDaily(weatherData);
-  renderHourly(0);
+    const weatherRes = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,precipitation,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=weather_code,temperature_2m&timezone=auto`,
+    );
+
+    if (!weatherRes.ok) throw new Error("Weather fetch failed");
+
+    weatherData = await weatherRes.json();
+
+    const today = new Date().toLocaleDateString(undefined, {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    renderCurrent(weatherData, name, country, today);
+    renderStats(weatherData);
+    renderDaily(weatherData);
+    renderHourly(0);
+  } catch {
+    renderError();
+  }
 }
 
 let reverseGeocoder = new BDCReverseGeocode();
@@ -183,10 +231,16 @@ dayBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   dayMenu.classList.toggle("hidden");
 });
+
 searchBtn.addEventListener("click", () => {
-  if (userInput.value !== "") {
-    fetchUserInput(userInput.value);
+  const value = userInput.value.trim();
+
+  if (!value) {
+    renderEmptySearch();
+    return;
   }
+
+  fetchUserInput(value);
 });
 
 dayItems.forEach((item, index) => {
