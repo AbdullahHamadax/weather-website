@@ -184,7 +184,6 @@ dayBtn.addEventListener("click", (e) => {
   dayMenu.classList.toggle("hidden");
 });
 searchBtn.addEventListener("click", () => {
-  console.log(userInput.value);
   if (userInput.value !== "") {
     fetchUserInput(userInput.value);
   }
